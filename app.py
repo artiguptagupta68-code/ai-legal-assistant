@@ -1,26 +1,37 @@
 # ==========================================
-# 📄 AI LEGAL DOCUMENT ASSISTANT (FINAL STABLE)
+# 📄 AI LEGAL DOCUMENT ASSISTANT (FINAL FIXED)
 # ==========================================
 
 import streamlit as st
 import spacy
+from spacy.cli import download
 from transformers import pipeline
+
+# -------------------------------
+# 🔹 Safe spaCy Loader (FIXED)
+# -------------------------------
+def load_spacy():
+    try:
+        return spacy.load("en_core_web_sm")
+    except:
+        download("en_core_web_sm")
+        return spacy.load("en_core_web_sm")
+
 
 # -------------------------------
 # 🔹 Load Models (Cached)
 # -------------------------------
 @st.cache_resource
 def load_models():
-    # ✅ Load spaCy (installed via requirements.txt)
-    nlp = spacy.load("en_core_web_sm")
+    nlp = load_spacy()   # ✅ FIXED
 
-    # ✅ Lightweight summarizer (low memory)
+    # ✅ Lightweight summarizer
     summarizer = pipeline(
         task="summarization",
         model="sshleifer/distilbart-cnn-6-6"
     )
 
-    # ✅ Lightweight Q&A generator
+    # ✅ Lightweight Q&A model
     generator = pipeline(
         task="text2text-generation",
         model="google/flan-t5-small"
@@ -58,9 +69,7 @@ def extract_entities(text):
     entities = {}
 
     for ent in doc.ents:
-        if ent.label_ not in entities:
-            entities[ent.label_] = []
-        entities[ent.label_].append(ent.text)
+        entities.setdefault(ent.label_, []).append(ent.text)
 
     return entities
 
@@ -128,7 +137,6 @@ Answer:
 
         answer = result[0]["generated_text"]
 
-        # Clean output
         if "Answer:" in answer:
             answer = answer.split("Answer:")[-1].strip()
 
@@ -152,7 +160,7 @@ st.markdown("Analyze legal documents using AI (Summary, Clauses, Risks, Q&A)")
 text_input = st.text_area("📥 Paste Legal Document Here", height=250)
 
 # -------------------------------
-# 🔹 ANALYZE BUTTON
+# 🔹 ANALYSIS
 # -------------------------------
 if st.button("🔍 Analyze Document"):
 
