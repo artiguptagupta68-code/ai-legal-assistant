@@ -1,6 +1,6 @@
 streamlit
 transformers
 torch
+torchvision
 spacy
 sentencepiece
-torchvision
