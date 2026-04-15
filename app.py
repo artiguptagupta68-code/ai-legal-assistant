@@ -1,37 +1,26 @@
 # ==========================================
-# 📄 AI LEGAL DOCUMENT ASSISTANT (FINAL DEPLOYABLE)
+# 📄 AI LEGAL DOCUMENT ASSISTANT (FINAL STABLE)
 # ==========================================
 
 import streamlit as st
 import spacy
-import subprocess
 from transformers import pipeline
 
 # -------------------------------
-# 🔹 Load spaCy model safely
-# -------------------------------
-def load_spacy_model():
-    try:
-        return spacy.load("en_core_web_sm")
-    except:
-        subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
-        return spacy.load("en_core_web_sm")
-
-
-# -------------------------------
-# 🔹 Load Models (Optimized)
+# 🔹 Load Models (Cached)
 # -------------------------------
 @st.cache_resource
 def load_models():
-    nlp = load_spacy_model()
+    # ✅ Load spaCy (installed via requirements.txt)
+    nlp = spacy.load("en_core_web_sm")
 
-    # ✅ Lightweight summarizer
+    # ✅ Lightweight summarizer (low memory)
     summarizer = pipeline(
         task="summarization",
         model="sshleifer/distilbart-cnn-6-6"
     )
 
-    # ✅ Lightweight smart AI model
+    # ✅ Lightweight Q&A generator
     generator = pipeline(
         task="text2text-generation",
         model="google/flan-t5-small"
@@ -40,17 +29,26 @@ def load_models():
     return nlp, summarizer, generator
 
 
+# Load once
 nlp, summarizer, generator = load_models()
 
 # -------------------------------
 # 🔹 Functions
 # -------------------------------
+
 def generate_summary(text):
     try:
-        if len(text) < 50:
+        if len(text.strip()) < 50:
             return "⚠️ Text too short to summarize"
-        result = summarizer(text, max_length=80, min_length=25, do_sample=False)
+
+        result = summarizer(
+            text,
+            max_length=80,
+            min_length=25,
+            do_sample=False
+        )
         return result[0]['summary_text']
+
     except Exception as e:
         return f"⚠️ Summary error: {str(e)}"
 
@@ -58,8 +56,12 @@ def generate_summary(text):
 def extract_entities(text):
     doc = nlp(text)
     entities = {}
+
     for ent in doc.ents:
-        entities.setdefault(ent.label_, []).append(ent.text)
+        if ent.label_ not in entities:
+            entities[ent.label_] = []
+        entities[ent.label_].append(ent.text)
+
     return entities
 
 
@@ -79,6 +81,9 @@ def extract_clauses(text):
     if "notice" in text_lower:
         clauses["Notice Period"] = "Notice period mentioned"
 
+    if "liability" in text_lower:
+        clauses["Liability Clause"] = "Liability defined"
+
     return clauses
 
 
@@ -94,6 +99,9 @@ def detect_risks(text):
 
     if "liability" not in text_lower:
         risks.append("⚠️ Liability clause missing")
+
+    if "jurisdiction" not in text_lower:
+        risks.append("⚠️ Jurisdiction not defined")
 
     return risks
 
@@ -111,35 +119,46 @@ Question:
 
 Answer:
 """
-        result = generator(prompt, max_length=150, do_sample=False)
+
+        result = generator(
+            prompt,
+            max_length=150,
+            do_sample=False
+        )
+
         answer = result[0]["generated_text"]
 
+        # Clean output
         if "Answer:" in answer:
-            return answer.split("Answer:")[-1].strip()
-        return answer.strip()
+            answer = answer.split("Answer:")[-1].strip()
+
+        return answer
 
     except Exception as e:
         return f"⚠️ Error generating answer: {str(e)}"
 
 
 # -------------------------------
-# 🔹 UI Layout
+# 🔹 UI CONFIG
 # -------------------------------
 st.set_page_config(page_title="AI Legal Assistant", layout="wide")
 
 st.title("📄 AI Legal Document Assistant")
 st.markdown("Analyze legal documents using AI (Summary, Clauses, Risks, Q&A)")
 
-# Input
+# -------------------------------
+# 🔹 INPUT
+# -------------------------------
 text_input = st.text_area("📥 Paste Legal Document Here", height=250)
 
 # -------------------------------
-# 🔹 Analyze Button
+# 🔹 ANALYZE BUTTON
 # -------------------------------
 if st.button("🔍 Analyze Document"):
 
     if not text_input.strip():
-        st.warning("Please enter legal text")
+        st.warning("⚠️ Please enter legal text")
+
     else:
         # Summary
         st.subheader("🧾 Summary")
@@ -152,6 +171,7 @@ if st.button("🔍 Analyze Document"):
         # Clauses
         st.subheader("🔑 Key Clauses")
         clauses = extract_clauses(text_input)
+
         if clauses:
             st.write(clauses)
         else:
@@ -160,23 +180,25 @@ if st.button("🔍 Analyze Document"):
         # Risks
         st.subheader("⚠️ Risk Analysis")
         risks = detect_risks(text_input)
+
         if risks:
             for r in risks:
                 st.error(r)
         else:
             st.success("No major risks detected")
 
-# -------------------------------
-# 🔹 Smart Q&A Section
-# -------------------------------
-st.subheader("💬 Ask Questions (Smart AI)")
 
-question = st.text_input("Ask anything about the document")
+# -------------------------------
+# 🔹 Q&A SECTION
+# -------------------------------
+st.subheader("💬 Ask Questions")
+
+question = st.text_input("Ask something about the document")
 
 if question and text_input:
     answer = ask_question(question, text_input)
 
-    if not answer.strip():
-        st.warning("No clear answer found")
-    else:
+    if answer.strip():
         st.success(answer)
+    else:
+        st.warning("No clear answer found")
