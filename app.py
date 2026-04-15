@@ -1,17 +1,29 @@
 # ==========================================
-# 📄 AI LEGAL DOCUMENT ASSISTANT (FINAL)
+# 📄 AI LEGAL DOCUMENT ASSISTANT (FINAL DEPLOYABLE)
 # ==========================================
 
 import streamlit as st
 import spacy
+import subprocess
 from transformers import pipeline
+
+# -------------------------------
+# 🔹 Load spaCy model safely
+# -------------------------------
+def load_spacy_model():
+    try:
+        return spacy.load("en_core_web_sm")
+    except:
+        subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
+        return spacy.load("en_core_web_sm")
+
 
 # -------------------------------
 # 🔹 Load Models (Optimized)
 # -------------------------------
 @st.cache_resource
 def load_models():
-    nlp = spacy.load("en_core_web_sm")
+    nlp = load_spacy_model()
 
     # ✅ Lightweight summarizer
     summarizer = pipeline(
